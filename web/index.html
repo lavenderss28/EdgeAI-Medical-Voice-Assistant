@@ -1,0 +1,186 @@
+﻿<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Edge AI Voice Assistant</title>
+
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background: #f4f6f8;
+            text-align: center;
+            padding-top: 80px;
+        }
+
+        .box {
+            background: white;
+            width: 600px;
+            max-width: 90%;
+            margin: auto;
+            padding: 40px;
+            border-radius: 20px;
+            box-shadow: 0 5px 25px rgba(0,0,0,0.1);
+        }
+
+        h1 {
+            margin-bottom: 10px;
+        }
+
+        #status {
+            margin: 25px;
+            font-size: 18px;
+        }
+
+        button {
+            width: 180px;
+            height: 180px;
+            border-radius: 50%;
+            border: none;
+            background: #222;
+            color: white;
+            font-size: 22px;
+            cursor: pointer;
+        }
+
+        button.recording {
+            background: #d33;
+        }
+
+        #you, #answer {
+            text-align: left;
+            margin-top: 25px;
+            padding: 15px;
+            background: #f1f1f1;
+            border-radius: 10px;
+        }
+    </style>
+</head>
+
+<body>
+
+<div class="box">
+
+    <h1>🎙️ Edge AI Voice Assistant</h1>
+
+    <p>100% local AI • CPU only</p>
+
+    <div id="status">Press the button and speak</div>
+
+    <button id="mic">🎤<br>Speak</button>
+
+    <div id="you" style="display:none;">
+        <b>You said:</b>
+        <div id="text"></div>
+    </div>
+
+    <div id="answer" style="display:none;">
+        <b>AI:</b>
+        <div id="response"></div>
+    </div>
+
+</div>
+
+<script>
+
+let recorder;
+let chunks = [];
+
+const button = document.getElementById("mic");
+const status = document.getElementById("status");
+
+button.onclick = async () => {
+
+    if (!recorder || recorder.state === "inactive") {
+
+        try {
+
+            const stream = await navigator.mediaDevices.getUserMedia({
+                audio: true
+            });
+
+            recorder = new MediaRecorder(stream);
+            chunks = [];
+
+            recorder.ondataavailable = e => {
+                if (e.data.size > 0) {
+                    chunks.push(e.data);
+                }
+            };
+
+            recorder.onstop = async () => {
+
+                stream.getTracks().forEach(track => track.stop());
+
+                status.innerText = "⏳ Thinking...";
+
+                const blob = new Blob(chunks, {
+                    type: "audio/webm"
+                });
+
+                const form = new FormData();
+                form.append("audio", blob, "speech.webm");
+
+                try {
+
+                    const res = await fetch("/process", {
+                        method: "POST",
+                        body: form
+                    });
+
+                    const data = await res.json();
+
+                    if (data.error) {
+                        status.innerText = "❌ " + data.error;
+                        return;
+                    }
+
+                    document.getElementById("you").style.display = "block";
+                    document.getElementById("answer").style.display = "block";
+
+                    document.getElementById("text").innerText = data.text;
+                    document.getElementById("response").innerText = data.answer;
+
+                    status.innerText = "🔊 Speaking...";
+
+                    const audio = new Audio(data.audio_url);
+
+                    audio.onended = () => {
+                        status.innerText = "Press the button and speak";
+                    };
+
+                    audio.play();
+
+                } catch (error) {
+
+                    console.error(error);
+                    status.innerText = "❌ Something went wrong.";
+
+                }
+            };
+
+            recorder.start();
+
+            button.classList.add("recording");
+            button.innerHTML = "🔴<br>Listening...";
+            status.innerText = "🎤 Listening... Speak now";
+
+        } catch (error) {
+
+            status.innerText = "❌ Microphone permission denied.";
+
+        }
+
+    } else {
+
+        recorder.stop();
+
+        button.classList.remove("recording");
+        button.innerHTML = "🎤<br>Speak";
+
+    }
+};
+
+</script>
+
+</body>
+</html>

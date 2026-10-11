@@ -1,0 +1,13 @@
+.venv/
+__pycache__/
+*.pyc
+audio/*
+!audio/.gitkeep
+logs/
+models/stt/*
+models/tts/*
+.env
+*.wav
+*.webm
+models/llm/
+models/**/*.gguf
